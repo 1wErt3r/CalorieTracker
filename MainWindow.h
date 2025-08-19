@@ -10,6 +10,7 @@
 #include <TextControl.h>
 #include <Window.h>
 
+class BFilePanel;
 class DateInputDialog;
 
 
@@ -30,6 +31,8 @@ private:
 	void _SaveData();
 	void _UpdateDayPicker();
 	bool _ValidateInput(const char* foodName, const char* caloriesText, BString& errorMsg);
+	void _ExportCSV();
+	void _SaveCSV(BMessage* message);
 
 	BTextControl* fFoodNameText;
 	BTextControl* fCaloriesText;
@@ -45,6 +48,7 @@ private:
 	BStringView* fTotalCaloriesView;
 	BStringView* fDayStatusView;
 	BString fCurrentDay;
+	BFilePanel* fFilePanel;
 
 	BMessage fFoodData;
 };

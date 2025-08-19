@@ -6,6 +6,7 @@
 #include <Button.h>
 #include <Catalog.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <FindDirectory.h>
 #include <LayoutBuilder.h>
 #include <Menu.h>
@@ -25,6 +26,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Window"
@@ -38,6 +40,8 @@ static const uint32 kMsgRemoveDay = 'rday';
 static const uint32 kMsgEditFood = 'edit';
 static const uint32 kMsgCustomDateOK = 'ok  ';
 static const uint32 kMsgCustomDateCancel = 'cncl';
+static const uint32 kMsgExportCSV = 'csv ';
+static const uint32 kMsgSaveCSV = 'scsv';
 
 
 MainWindow::MainWindow()
@@ -47,6 +51,9 @@ MainWindow::MainWindow()
 	fCurrentDay("")
 {
 	BLayoutBuilder::Group<>(this, B_VERTICAL).Add(_BuildMenuBar()).Add(_BuildMainView()).End();
+
+	fFilePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this), NULL, 0, false,
+		new BMessage(kMsgSaveCSV));
 
 	_LoadData();
 	_UpdateDayPicker();
@@ -65,6 +72,7 @@ MainWindow::_BuildMenuBar()
 
 	BMenu* fileMenu = new BMenu(B_TRANSLATE("Calorie Tracker"));
 	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("New day"), new BMessage(kMsgNewDay), 'N'));
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("CSV Export"), new BMessage(kMsgExportCSV), 'E'));
 	fileMenu->AddSeparatorItem();
 	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Quit"), new BMessage(B_QUIT_REQUESTED), 'Q'));
 
@@ -224,6 +232,7 @@ MainWindow::_SaveData()
 MainWindow::~MainWindow()
 {
 	_SaveData();
+	delete fFilePanel;
 }
 
 
@@ -280,6 +289,73 @@ MainWindow::_UpdateDailyFoodList()
 	}
 
 	fRemoveButton->SetEnabled(fDailyFoodListView->CountRows() > 0);
+}
+
+
+void
+MainWindow::_ExportCSV()
+{
+	fFilePanel->Show();
+}
+
+
+void
+MainWindow::_SaveCSV(BMessage* message)
+{
+	entry_ref ref;
+	if (message->FindRef("directory", &ref) != B_OK)
+		return;
+
+	const char* name;
+	if (message->FindString("name", &name) != B_OK)
+		return;
+
+	BPath path(&ref);
+	path.Append(name);
+
+	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	if (file.InitCheck() != B_OK) {
+		BAlert* alert = new BAlert(B_TRANSLATE("Export Error"),
+			B_TRANSLATE("Could not create CSV file."), B_TRANSLATE("OK"));
+		alert->Go();
+		return;
+	}
+
+	// Write CSV header
+	BString header("Food,Calories,Date\n");
+	file.Write(header.String(), header.Length());
+
+	// Write all entries for all days
+	const char* date;
+	for (int32 i = 0; fFoodData.FindString("days", i, &date) == B_OK; i++) {
+		BMessage entry;
+		for (int32 j = 0; fFoodData.FindMessage("entries", j, &entry) == B_OK; j++) {
+			const char* entryDate;
+			if (entry.FindString("date", &entryDate) == B_OK && strcmp(date, entryDate) == 0) {
+				const char* foodName;
+				int32 calories;
+
+				if (entry.FindString("name", &foodName) == B_OK
+					&& entry.FindInt32("calories", &calories) == B_OK) {
+
+					// Escape quotes in food name for CSV
+					BString escapedName(foodName);
+					escapedName.ReplaceAll("\"", "\"\"");
+
+					BString csvLine;
+					csvLine << "\"" << escapedName.String() << "," << calories << ","
+							<< "\"" << date << "\"\n";
+					file.Write(csvLine.String(), csvLine.Length());
+				}
+			}
+		}
+	}
+
+	BString successMsg;
+	successMsg << B_TRANSLATE("CSV exported successfully to:\n") << path.Path();
+	BAlert* alert
+		= new BAlert(B_TRANSLATE("Export Complete"), successMsg.String(), B_TRANSLATE("OK"));
+	alert->Go();
 }
 
 
@@ -597,6 +673,7 @@ MainWindow::MessageReceived(BMessage* message)
 			for (int32 i = 0; fFoodData.FindMessage("unique_foods", i, &uniqueFood) == B_OK; i++) {
 				const char* name;
 				if (uniqueFood.FindString("name", &name) == B_OK && strcmp(name, foodName) == 0) {
+
 					uniqueFood.FindInt32("calories", &currentCalories);
 					break;
 				}
@@ -610,6 +687,16 @@ MainWindow::MessageReceived(BMessage* message)
 				= new BAlert(B_TRANSLATE("Edit Food"), alertText.String(), B_TRANSLATE("OK"));
 			alert->Go();
 			// Note: In a real implementation, you'd want a proper edit dialog
+		} break;
+
+		case kMsgExportCSV:
+		{
+			_ExportCSV();
+		} break;
+
+		case kMsgSaveCSV:
+		{
+			_SaveCSV(message);
 		} break;
 
 		case kMsgFoodSelectionChanged:

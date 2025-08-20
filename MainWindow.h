@@ -6,6 +6,7 @@
 #include <ColumnListView.h>
 #include <ListView.h>
 #include <MenuField.h>
+#include <SplitView.h>
 #include <StringView.h>
 #include <TextControl.h>
 #include <Window.h>

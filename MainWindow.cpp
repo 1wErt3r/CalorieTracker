@@ -141,9 +141,21 @@ MainWindow::_BuildMainView()
 	fDayStatusView = new BStringView("dayStatus", B_TRANSLATE("No day selected"));
 	fDayStatusView->SetFont(be_plain_font);
 
-	// Layout the UI with better organization
-	BLayoutBuilder::Group<>(mainView, B_VERTICAL)
+	// Create BSplitView for better layout
+	BSplitView* splitView = new BSplitView(B_HORIZONTAL, B_USE_DEFAULT_SPACING);
+	splitView->SetCollapsible(false);
 
+	// Left panel for day management and food input
+	BView* leftPanel = new BView("leftPanel", B_WILL_DRAW);
+	leftPanel->SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
+
+	// Right panel for food list
+	BView* rightPanel = new BView("rightPanel", B_WILL_DRAW);
+	rightPanel->SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
+
+	// Layout the left panel
+	BLayoutBuilder::Group<>(leftPanel, B_VERTICAL)
+		.SetInsets(B_USE_DEFAULT_SPACING)
 		// Day management section
 		.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
 		.Add(new BStringView("dayLabel", B_TRANSLATE("Day Management")))
@@ -155,23 +167,8 @@ MainWindow::_BuildMainView()
 		.AddGlue()
 		.End()
 		.End()
-
+		.AddGlue()
 		// Input section
-
-
-		// Data views section
-		.AddGroup(B_HORIZONTAL, B_USE_DEFAULT_SPACING)
-		// Unique foods panel
-
-
-		// Daily foods panel
-		.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
-		.Add(new BStringView("dailyFoodsLabel", B_TRANSLATE("Today's Food Intake")))
-		.Add(fDailyFoodListView)
-		.Add(fTotalCaloriesView)
-		.End()
-		.End()
-
 		.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
 		.Add(new BStringView("inputLabel", B_TRANSLATE("Add Food Entry")))
 		.AddGrid(B_USE_DEFAULT_SPACING, B_USE_SMALL_SPACING)
@@ -186,7 +183,25 @@ MainWindow::_BuildMainView()
 		.AddGlue()
 		.End()
 		.End()
-		.SetInsets(B_USE_DEFAULT_SPACING);
+		.End();
+
+	// Layout the right panel
+	BLayoutBuilder::Group<>(rightPanel, B_VERTICAL)
+		.SetInsets(B_USE_DEFAULT_SPACING)
+		// Daily foods panel
+		.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
+		.Add(new BStringView("dailyFoodsLabel", B_TRANSLATE("Today's Food Intake")))
+		.Add(fDailyFoodListView)
+		.Add(fTotalCaloriesView)
+		.End()
+		.End();
+
+	// Add panels to split view
+	splitView->AddChild(leftPanel, 1.0f); // Left panel with weight 1.0
+	splitView->AddChild(rightPanel, 2.0f); // Right panel with weight 2.0
+
+	// Layout the main view with the split view
+	BLayoutBuilder::Group<>(mainView, B_VERTICAL).Add(splitView).SetInsets(0).End();
 
 	return mainView;
 }
@@ -422,10 +437,6 @@ MainWindow::_ValidateInput(const char* foodName, const char* caloriesText, BStri
 		return false;
 	}
 
-	if (!caloriesText || strlen(caloriesText) == 0) {
-		errorMsg = B_TRANSLATE("Please enter calorie amount.");
-		return false;
-	}
 
 	int32 calories = atoi(caloriesText);
 	if (calories <= 0 || calories > 9999) {
